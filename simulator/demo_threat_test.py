@@ -43,8 +43,6 @@ def run_guided_threat_demo(use_gui_popup: bool = True):
 
     # Initialize components
     db = DatabaseManager()
-    db.remove_from_whitelist("python")
-    db.remove_from_whitelist("mock_ransomware_actor.py")
     terminator = ProcessTerminator()
     detector = RansomwareDetector()
     file_monitor = FileMonitor(config.DEFAULT_WATCH_DIRECTORY)
@@ -76,8 +74,9 @@ def run_guided_threat_demo(use_gui_popup: bool = True):
         ts = time.strftime("%H:%M:%S")
         ops = res.features.get("total_operations", 0)
         ratio = res.features.get("rename_modify_ratio", 0)
+        score = int(res.confidence * 100)
 
-        print(f"      [{ts}] Status: {res.threat_level.value} (Confidence: {res.confidence*100:.1f}%) | Ops: {ops:.0f} | Rename/Modify: {ratio:.2f}")
+        print(f"[{ts}] Poll {poll+1:02d}/15: Level={res.threat_level.value:<10} Score={score:>3d}/100 | Ops={ops:>3.0f} | Ratio={ratio:.2f}")
 
         if res.is_ransomware:
             detected_result = res
@@ -89,6 +88,20 @@ def run_guided_threat_demo(use_gui_popup: bool = True):
 
     if not detected_result:
         print("\n⚠️ No threat threshold reached within timeout.")
+        if actor_proc.poll() is None:
+            actor_proc.kill()
+        file_monitor.stop()
+        process_monitor.stop()
+        return
+
+    # Check Whitelist
+    if db.is_whitelisted(detected_result.suspect_name):
+        print("\n" + "=" * 70)
+        print(f"🛡️  WHITELIST ACTIVE: Process '{detected_result.suspect_name}' is in the permanent whitelist.")
+        print(f"   AI Threat alert is suppressed and allowed without interrupting.")
+        print(f"   To re-enable prompt alerts for this process, click 'Reset Whitelist' or run:")
+        print(f"   python3 app.py --clear-whitelist")
+        print("=" * 70 + "\n")
         if actor_proc.poll() is None:
             actor_proc.kill()
         file_monitor.stop()

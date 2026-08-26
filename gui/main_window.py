@@ -419,19 +419,14 @@ class MainWindow(QMainWindow):
         )
 
     def _run_test_simulation(self):
-        # Ensure session ignores and whitelisting do not suppress test prompt
-        self.session_ignored_pids.clear()
-        self.db.remove_from_whitelist("python")
-        self.db.remove_from_whitelist("mock_ransomware_actor.py")
-        self.page_settings.refresh_whitelist()
-
         sim = SafeRansomwareSimulator(num_files=80)
         QTimer.singleShot(200, sim.run_full_simulation)
         QMessageBox.information(
             self,
             "Simulation Started (80 Files)",
             "Safe 80-file ransomware burst initiated inside test_environment/.\n"
-            "Whitelists have been reset. Watch the Live Activity and Threat Alert Prompt appear!",
+            "If the process is NOT whitelisted, the prompt alert will appear.\n"
+            "(If whitelisted, it will run silently until you click 'Reset Whitelist'.)",
         )
 
     def closeEvent(self, event):
