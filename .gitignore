@@ -3,9 +3,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Logs
+# Logs & Databases
 logs/*.log
 *.log
+database/*.db
+
+# Test Environment & Generated Reports
+test_environment/*
+!test_environment/.gitkeep
+reporting/reports/*.pdf
 
 # Environments
 .env
