@@ -1,0 +1,17 @@
+# --- Used in this 30% delivery (Phases 1-5) ---
+psutil>=5.9.0
+watchdog>=4.0.0
+
+# --- Required later, listed now per the full tech stack (Section 6) ---
+# GUI (Phase 13+)
+PySide6>=6.6.0
+# Data processing (Phase 6+)
+pandas>=2.0.0
+numpy>=1.24.0
+# Machine learning (Phase 7+)
+scikit-learn>=1.3.0
+joblib>=1.3.0
+# Visualization (Phase 14+)
+matplotlib>=3.7.0
+# Reporting (Phase 15+)
+reportlab>=4.0.0
