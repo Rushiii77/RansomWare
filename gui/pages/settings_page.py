@@ -206,6 +206,37 @@ class SettingsPage(QWidget):
         """)
         right_layout.addWidget(self.table_wl)
 
+        wl_btn_box = QHBoxLayout()
+        btn_del_wl = QPushButton("Remove Selected")
+        btn_del_wl.setStyleSheet("""
+            QPushButton {
+                background-color: #e11d48;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover { background-color: #be123c; }
+        """)
+        btn_del_wl.clicked.connect(self._remove_selected_whitelist)
+        wl_btn_box.addWidget(btn_del_wl)
+
+        btn_clear_wl = QPushButton("Clear Entire Whitelist")
+        btn_clear_wl.setStyleSheet("""
+            QPushButton {
+                background-color: #475569;
+                color: #f8fafc;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover { background-color: #334155; }
+        """)
+        btn_clear_wl.clicked.connect(self._clear_all_whitelist)
+        wl_btn_box.addWidget(btn_clear_wl)
+
+        right_layout.addLayout(wl_btn_box)
+
         content_layout.addWidget(right_box, stretch=1)
         layout.addLayout(content_layout)
 
@@ -235,6 +266,31 @@ class SettingsPage(QWidget):
             self.txt_whitelist_name.clear()
             self.refresh_whitelist()
             QMessageBox.information(self, "Process Whitelisted", f"Added '{name}' to trusted whitelist.")
+
+    def _remove_selected_whitelist(self):
+        curr_row = self.table_wl.currentRow()
+        if curr_row < 0:
+            QMessageBox.warning(self, "Selection Required", "Please select a whitelisted process from the table to remove.")
+            return
+        name_item = self.table_wl.item(curr_row, 0)
+        if name_item:
+            name = name_item.text()
+            self.db.remove_from_whitelist(name)
+            self.refresh_whitelist()
+            QMessageBox.information(self, "Whitelist Updated", f"Removed '{name}' from whitelist. Alerts will now trigger for this process.")
+
+    def _clear_all_whitelist(self):
+        reply = QMessageBox.question(
+            self,
+            "Clear Whitelist",
+            "Are you sure you want to clear the entire process whitelist? All previously ignored/whitelisted processes will trigger alerts again.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            cnt = self.db.clear_whitelist()
+            self.refresh_whitelist()
+            QMessageBox.information(self, "Whitelist Cleared", f"Cleared {cnt} entries from whitelist. Prompt alerts are fully restored!")
 
     def refresh_whitelist(self):
         names = self.db.get_whitelist()

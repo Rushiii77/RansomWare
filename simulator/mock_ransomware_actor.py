@@ -28,23 +28,23 @@ def main():
     print(f"   Target Sandbox Directory: {config.TEST_ENV_DIR}")
     print("=" * 65)
 
-    simulator = SafeRansomwareSimulator(num_files=40)
+    simulator = SafeRansomwareSimulator(num_files=75)
 
     try:
         # Step 1: Create decoy files
-        print(f"[{time.strftime('%H:%M:%S')}] Step 1: Creating 40 test files in sandbox...")
+        print(f"[{time.strftime('%H:%M:%S')}] Step 1: Creating 75 test files in sandbox...")
         files = simulator.setup_files()
-        time.sleep(1.0)
+        time.sleep(0.5)
 
-        # Step 2: Continuous attack loop with slow burst so user can test interactive prompt
+        # Step 2: Continuous attack loop with burst so user can test interactive prompt
         print(f"[{time.strftime('%H:%M:%S')}] Step 2: Initiating rapid modify & rename bursts...")
         round_count = 1
-        while round_count <= 10:
+        while round_count <= 25:
             print(f"[{time.strftime('%H:%M:%S')}] Attack Round {round_count}: Overwriting and renaming files...")
-            simulator.run_modify_burst(iterations=2, delay=0.01)
+            simulator.run_modify_burst(iterations=3, delay=0.005)
             simulator.run_rename_burst()
             round_count += 1
-            time.sleep(1.5)
+            time.sleep(1.0)
 
         print(f"[{time.strftime('%H:%M:%S')}] Mock attack sequence completed.")
 

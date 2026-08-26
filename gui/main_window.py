@@ -233,8 +233,26 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addStretch()
 
+        # Reset Whitelist & Ignores Button
+        btn_reset_wl = QPushButton("🔄 Reset Whitelist & Ignores")
+        btn_reset_wl.setFont(QFont("Arial", 9))
+        btn_reset_wl.setCursor(Qt.PointingHandCursor)
+        btn_reset_wl.setStyleSheet("""
+            QPushButton {
+                background-color: #334155;
+                color: #cbd5e1;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 10px;
+                margin-bottom: 4px;
+            }
+            QPushButton:hover { background-color: #475569; color: white; }
+        """)
+        btn_reset_wl.clicked.connect(self._reset_all_whitelist_and_ignores)
+        sidebar_layout.addWidget(btn_reset_wl)
+
         # Quick Test Trigger Button
-        btn_sim_attack = QPushButton("🧪 Run Test Burst Attack")
+        btn_sim_attack = QPushButton("🧪 Run Test Burst Attack (80 Files)")
         btn_sim_attack.setFont(QFont("Arial", 9, QFont.Bold))
         btn_sim_attack.setCursor(Qt.PointingHandCursor)
         btn_sim_attack.setStyleSheet("""
@@ -389,13 +407,31 @@ class MainWindow(QMainWindow):
             self.worker.pause()
         self.page_dashboard.set_protection_status(self._is_protected)
 
+    def _reset_all_whitelist_and_ignores(self):
+        self.session_ignored_pids.clear()
+        cnt = self.db.clear_whitelist()
+        self.page_settings.refresh_whitelist()
+        QMessageBox.information(
+            self,
+            "Protection & Whitelist Reset",
+            f"Cleared {cnt} entries from whitelist and reset all session ignores.\n"
+            "The AI detector will now prompt for all suspicious activity!",
+        )
+
     def _run_test_simulation(self):
-        sim = SafeRansomwareSimulator(num_files=35)
+        # Ensure session ignores and whitelisting do not suppress test prompt
+        self.session_ignored_pids.clear()
+        self.db.remove_from_whitelist("python")
+        self.db.remove_from_whitelist("mock_ransomware_actor.py")
+        self.page_settings.refresh_whitelist()
+
+        sim = SafeRansomwareSimulator(num_files=80)
         QTimer.singleShot(200, sim.run_full_simulation)
         QMessageBox.information(
             self,
-            "Simulation Started",
-            "Safe simulation burst initiated inside test_environment/.\nWatch the Live Activity and Dashboard charts react!",
+            "Simulation Started (80 Files)",
+            "Safe 80-file ransomware burst initiated inside test_environment/.\n"
+            "Whitelists have been reset. Watch the Live Activity and Threat Alert Prompt appear!",
         )
 
     def closeEvent(self, event):

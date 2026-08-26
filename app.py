@@ -241,10 +241,17 @@ def main():
     parser.add_argument("--benchmark", action="store_true", help="Run performance benchmarks")
     parser.add_argument("--demo", action="store_true", help="Run integration demo")
     parser.add_argument("--cleanup", action="store_true", help="Clean up test_environment files")
+    parser.add_argument("--clear-whitelist", action="store_true", help="Clear all whitelisted processes from database")
 
     args = parser.parse_args()
 
-    if args.gui:
+    if args.clear_whitelist:
+        from database.db_manager import DatabaseManager
+        db = DatabaseManager()
+        c = db.clear_whitelist()
+        print(f"Cleared entire process whitelist ({c} entries removed). Alerts will now trigger for all processes.")
+        sys.exit(0)
+    elif args.gui:
         run_gui_app()
     elif args.tray:
         run_tray_app()

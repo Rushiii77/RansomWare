@@ -43,6 +43,8 @@ def run_guided_threat_demo(use_gui_popup: bool = True):
 
     # Initialize components
     db = DatabaseManager()
+    db.remove_from_whitelist("python")
+    db.remove_from_whitelist("mock_ransomware_actor.py")
     terminator = ProcessTerminator()
     detector = RansomwareDetector()
     file_monitor = FileMonitor(config.DEFAULT_WATCH_DIRECTORY)
