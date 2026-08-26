@@ -179,6 +179,26 @@ class DatabaseManager:
             logger.error("Error clearing whitelist: %s", e)
             return 0
 
+    def clear_all_incidents(self) -> int:
+        """Clear all incident records from database."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM incidents")
+                deleted = cursor.rowcount
+                conn.commit()
+                logger.info("Cleared all incidents (%d records removed).", deleted)
+                return deleted
+        except Exception as e:
+            logger.error("Error clearing incidents: %s", e)
+            return 0
+
+    def reset_database_to_default(self):
+        """Reset whitelist, incidents, and detections back to clean default factory state."""
+        self.clear_whitelist()
+        self.clear_all_incidents()
+        logger.info("Database reset to factory default clean state.")
+
     def is_whitelisted(self, name: Optional[str]) -> bool:
         """Check if process name is whitelisted."""
         if not name:
