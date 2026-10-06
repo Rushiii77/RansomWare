@@ -26,14 +26,14 @@ logger = get_logger("app")
 def run_gui_app():
     """Launch the primary Desktop Cybersecurity Command Center GUI."""
     from gui.main_window import launch_main_gui
-    print("Launching AI Ransomware Detection & Defense Command Center...")
+    print("Launching RansomShield Command Center...")
     launch_main_gui()
 
 
 def run_tray_app():
     """Launch the background System Tray / Menu Bar Antivirus Shield."""
     from gui.tray_app import launch_tray_application
-    print("Launching AI Ransomware Shield in Background (Menu Bar / System Tray)...")
+    print("Launching RansomShield in Background (Menu Bar / System Tray)...")
     launch_tray_application()
 
 
@@ -173,7 +173,7 @@ def run_benchmark():
 def interactive_menu():
     """Display an interactive menu for easy navigation."""
     print("=" * 65)
-    print("   AI-Based Ransomware Detection System - Interactive CLI")
+    print("      RansomShield: Autonomous Ransomware Defense CLI")
     print("=" * 65)
     print("1. 🖥️  Launch Full Desktop Dashboard GUI")
     print("2. 🛡️  Launch Background System Tray / Menu Bar Antivirus Shield")
@@ -224,7 +224,7 @@ def interactive_menu():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AI-Based Ransomware Detection & Process Termination System"
+        description="RansomShield - Real-Time Autonomous Ransomware Defense & Detection System"
     )
     parser.add_argument("--gui", action="store_true", help="Launch full desktop dashboard GUI")
     parser.add_argument("--tray", action="store_true", help="Launch background system tray / menu bar shield")
@@ -241,17 +241,10 @@ def main():
     parser.add_argument("--benchmark", action="store_true", help="Run performance benchmarks")
     parser.add_argument("--demo", action="store_true", help="Run integration demo")
     parser.add_argument("--cleanup", action="store_true", help="Clean up test_environment files")
-    parser.add_argument("--clear-whitelist", action="store_true", help="Clear all whitelisted processes from database")
 
     args = parser.parse_args()
 
-    if args.clear_whitelist:
-        from database.db_manager import DatabaseManager
-        db = DatabaseManager()
-        c = db.clear_whitelist()
-        print(f"Cleared entire process whitelist ({c} entries removed). Alerts will now trigger for all processes.")
-        sys.exit(0)
-    elif args.gui:
+    if args.gui:
         run_gui_app()
     elif args.tray:
         run_tray_app()

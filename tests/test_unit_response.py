@@ -41,6 +41,11 @@ class TestProcessTerminator(unittest.TestCase):
         rep2 = self.terminator.terminate_process(0, reason="Test")
         self.assertEqual(rep2.status, TerminationStatus.PROTECTED_SYSTEM_PROCESS)
 
+        # Host application PID protection
+        self.assertTrue(self.terminator.is_protected(os.getpid()))
+        rep3 = self.terminator.terminate_process(os.getpid(), reason="Test self")
+        self.assertEqual(rep3.status, TerminationStatus.PROTECTED_SYSTEM_PROCESS)
+
     def test_terminate_real_child_process(self):
         # Spawn a harmless dummy python process
         proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
@@ -98,6 +103,11 @@ class TestDatabaseManager(unittest.TestCase):
 
         wl = self.db.get_whitelist()
         self.assertIn("my_safe_app", wl)
+
+        # Test remove from whitelist
+        self.assertTrue(self.db.remove_from_whitelist("my_safe_app"))
+        self.assertFalse(self.db.is_whitelisted("my_safe_app"))
+        self.assertNotIn("my_safe_app", self.db.get_whitelist())
 
     def test_stats(self):
         self.db.record_incident("HIGH_RISK", 0.85, 111, "app1", "TERMINATED")

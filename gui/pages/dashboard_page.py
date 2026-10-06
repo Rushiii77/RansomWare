@@ -83,7 +83,7 @@ class DashboardPage(QWidget):
         self.status_label.setStyleSheet("color: #22c55e;")
         status_layout.addWidget(self.status_label)
 
-        sub_status = QLabel("AI Behavioral Monitor: Real-Time Endpoint Defense")
+        sub_status = QLabel("RansomShield: Real-Time Autonomous Endpoint Defense")
         sub_status.setFont(QFont("Arial", 9))
         sub_status.setStyleSheet("color: #94a3b8;")
         status_layout.addWidget(sub_status)

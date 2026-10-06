@@ -152,15 +152,19 @@ class DatabaseManager:
             return False
 
     def remove_from_whitelist(self, name: str) -> bool:
-        """Remove a process name from the permanent whitelist."""
+        """Remove a process name from the whitelist."""
+        if not name:
+            return False
         clean_name = name.strip().lower()
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM whitelist WHERE name = ?", (clean_name,))
                 conn.commit()
-                logger.info("Removed '%s' from whitelist.", clean_name)
-                return True
+                deleted = cursor.rowcount > 0
+                if deleted:
+                    logger.info("Removed '%s' from whitelist.", clean_name)
+                return deleted
         except Exception as e:
             logger.error("Error removing from whitelist: %s", e)
             return False
@@ -225,5 +229,4 @@ class DatabaseManager:
             cursor.execute("SELECT COUNT(*) as ignored FROM incidents WHERE action_taken LIKE '%IGNORED%'")
             ign = cursor.fetchone()["ignored"]
             return {"total_threats": total, "terminated": term, "ignored": ign}
-
 

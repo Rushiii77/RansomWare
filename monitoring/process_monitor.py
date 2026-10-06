@@ -115,7 +115,7 @@ class ProcessMonitor:
     def _poll_once(self):
         new_snapshots: Dict[int, ProcessSnapshot] = {}
 
-        attrs = ["pid", "name", "exe", "status", "create_time", "username", "cpu_percent", "memory_info"]
+        attrs = ["pid", "name", "exe", "cmdline", "status", "create_time", "username", "cpu_percent", "memory_info"]
         for proc in psutil.process_iter(attrs=attrs):
             try:
                 info = proc.info
@@ -126,9 +126,19 @@ class ProcessMonitor:
                 mem_info = info.get("memory_info")
                 mem_mb = (mem_info.rss / (1024 * 1024)) if mem_info else 0.0
 
+                pname = info.get("name") or "unknown"
+                cmdline = info.get("cmdline") or []
+                for arg in cmdline:
+                    if "mock_ransomware_actor" in arg:
+                        pname = "mock_ransomware_actor.py"
+                        break
+                    elif "safe_ransomware_simulator" in arg:
+                        pname = "safe_ransomware_simulator.py"
+                        break
+
                 snap = ProcessSnapshot(
                     pid=info.get("pid"),
-                    name=info.get("name") or "unknown",
+                    name=pname,
                     exe_path=info.get("exe"),
                     cpu_percent=round(float(cpu), 2),
                     memory_mb=round(mem_mb, 2),

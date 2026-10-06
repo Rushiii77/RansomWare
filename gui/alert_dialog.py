@@ -48,7 +48,7 @@ class ThreatAlertDialog(QDialog):
         self.on_action = on_action
         self.user_choice: Optional[str] = None
 
-        self.setWindowTitle("🚨 Security Alert - Ransomware Activity Detected")
+        self.setWindowTitle("🚨 RansomShield Alert - Ransomware Activity Detected")
         self.setFixedSize(540, 480)
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
 

@@ -1,7 +1,7 @@
 """
 reporting package.
 
-PDF forensic incident report generator for AI-Based Ransomware Detection System.
+PDF forensic incident report generator for RansomShield Endpoint Defense System.
 """
 
 from reporting.report_generator import ReportGenerator, REPORTS_DIR

@@ -8,8 +8,11 @@ monitoring the operating system for ransomware behavioral patterns.
 When anomalous behavior is detected, pops up an interactive Terminate/Ignore prompt.
 """
 
+import os
+import subprocess
 import sys
 import time
+import threading
 from typing import Optional, Set
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal, QTimer
@@ -111,7 +114,7 @@ class ShieldWorker(QThread):
         self._running = False
         self.file_monitor.stop()
         self.process_monitor.stop()
-        self.wait(timeout=3000)
+        self.wait(3000)
 
 
 class SystemTrayShieldApp(QObject):
@@ -130,6 +133,7 @@ class SystemTrayShieldApp(QObject):
 
         self.session_ignored_pids: Set[int] = set()
         self.active_alert_dialog: Optional[ThreatAlertDialog] = None
+        self._active_sim_proc: Optional[subprocess.Popen] = None
 
         self._init_tray_icon()
         self._init_worker()
@@ -141,12 +145,12 @@ class SystemTrayShieldApp(QObject):
         self.icon_paused = create_shield_icon("#5f6368")     # Gray
 
         self.tray_icon.setIcon(self.icon_safe)
-        self.tray_icon.setToolTip("AI Ransomware Shield: Active & Protected")
+        self.tray_icon.setToolTip("RansomShield: Active & Protected")
 
         # Context Menu
         menu = QMenu()
 
-        self.status_action = QAction("🛡️ Shield: Active (Protected)", self)
+        self.status_action = QAction("🛡️ RansomShield: Active (Protected)", self)
         self.status_action.setEnabled(False)
         menu.addAction(self.status_action)
 
@@ -168,7 +172,7 @@ class SystemTrayShieldApp(QObject):
 
         menu.addSeparator()
 
-        self.action_quit = QAction("🚪 Quit Antivirus Shield", self)
+        self.action_quit = QAction("🚪 Quit RansomShield", self)
         self.action_quit.triggered.connect(self._quit_app)
         menu.addAction(self.action_quit)
 
@@ -224,6 +228,16 @@ class SystemTrayShieldApp(QObject):
         name = result.suspect_name or "unknown"
 
         if action == "terminate":
+            # Safety assertion: never self-terminate the host application or root process
+            if pid == os.getpid() or pid <= 1:
+                self.tray_icon.showMessage(
+                    "Action Denied",
+                    f"Process '{name}' (PID: {pid}) is the protected host application or system service and cannot be terminated.",
+                    QSystemTrayIcon.Warning,
+                    3000,
+                )
+                return
+
             report = self.terminator.terminate_process(pid, reason=f"User confirmed termination for {result.threat_level.value}")
             self.db.record_incident(
                 threat_level=result.threat_level.value,
@@ -234,12 +248,27 @@ class SystemTrayShieldApp(QObject):
                 features=result.features,
                 details=report.details,
             )
-            self.tray_icon.showMessage(
-                "Process Terminated",
-                f"Successfully terminated {name} (PID: {pid}). File system secured.",
-                QSystemTrayIcon.Information,
-                4000,
-            )
+            if report.status in (TerminationStatus.TERMINATED, TerminationStatus.KILLED_FORCEFULLY):
+                self.tray_icon.showMessage(
+                    "Process Terminated",
+                    f"Successfully terminated {name} (PID: {pid}). File system secured.",
+                    QSystemTrayIcon.Information,
+                    4000,
+                )
+            elif report.status == TerminationStatus.PROTECTED_SYSTEM_PROCESS:
+                self.tray_icon.showMessage(
+                    "Action Denied",
+                    f"Process '{name}' (PID: {pid}) is protected and cannot be terminated.",
+                    QSystemTrayIcon.Warning,
+                    3000,
+                )
+            else:
+                self.tray_icon.showMessage(
+                    "Termination Notice",
+                    f"Could not terminate {name} (PID: {pid}): {report.details}",
+                    QSystemTrayIcon.Critical,
+                    4000,
+                )
 
         elif action == "ignore":
             if pid > 0:
@@ -275,15 +304,33 @@ class SystemTrayShieldApp(QObject):
             )
 
     def _trigger_test_simulation(self):
-        """Simulate a controlled benign burst in test_environment to trigger prompt."""
-        self.tray_icon.showMessage(
-            "Test Simulation",
-            "Launching safe sandbox burst in test_environment/... Alert will prompt shortly.",
-            QSystemTrayIcon.Information,
-            3000,
-        )
-        sim = SafeRansomwareSimulator(num_files=35)
-        QTimer.singleShot(500, sim.run_full_simulation)
+        """Simulate a controlled benign burst in test_environment using an isolated subprocess."""
+        try:
+            if self._active_sim_proc and self._active_sim_proc.poll() is None:
+                try:
+                    self._active_sim_proc.terminate()
+                except Exception:
+                    pass
+
+            actor_script = os.path.join(config.BASE_DIR, "simulator", "mock_ransomware_actor.py")
+            proc = subprocess.Popen([sys.executable, actor_script])
+            self._active_sim_proc = proc
+
+            self.tray_icon.showMessage(
+                "Test Simulation Started",
+                f"Launched test threat process (PID {proc.pid}) in test_environment/... Alert will prompt shortly.",
+                QSystemTrayIcon.Information,
+                3500,
+            )
+            logger.info("Burst attack simulation process launched with PID %d from system tray.", proc.pid)
+        except Exception as e:
+            logger.exception("Exception in _trigger_test_simulation: %s", e)
+            self.tray_icon.showMessage(
+                "Simulation Error",
+                f"Failed to start burst attack: {str(e)}",
+                QSystemTrayIcon.Critical,
+                5000,
+            )
 
     def _show_incident_history(self):
         incidents = self.db.get_recent_incidents(limit=20)
@@ -312,15 +359,20 @@ class SystemTrayShieldApp(QObject):
             self.worker.resume()
             self.tray_icon.setIcon(self.icon_safe)
             self.action_toggle.setText("⏸️ Pause Protection")
-            self.status_action.setText("🛡️ Shield: Active (Protected)")
+            self.status_action.setText("🛡️ RansomShield: Active (Protected)")
         else:
             self.worker.pause()
             self.tray_icon.setIcon(self.icon_paused)
             self.action_toggle.setText("▶️ Resume Protection")
-            self.status_action.setText("🛡️ Shield: Paused")
+            self.status_action.setText("🛡️ RansomShield: Paused")
 
     def _quit_app(self):
-        logger.info("Quitting System Tray Shield.")
+        logger.info("Quitting RansomShield.")
+        if self._active_sim_proc and self._active_sim_proc.poll() is None:
+            try:
+                self._active_sim_proc.terminate()
+            except Exception:
+                pass
         self.worker.stop()
         self.tray_icon.hide()
         self.app.quit()

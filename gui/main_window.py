@@ -7,8 +7,11 @@ Assembles the 9 modular pages into a sleek, responsive dark-themed cybersecurity
 command center with real-time background telemetry integration.
 """
 
+import os
+import subprocess
 import sys
 import time
+import threading
 from typing import Optional
 
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
@@ -30,19 +33,16 @@ from PySide6.QtWidgets import (
 import config
 from database.db_manager import DatabaseManager
 from gui.alert_dialog import ThreatAlertDialog
-from gui.pages.about_page import AboutPage
 from gui.pages.activity_page import LiveActivityPage
-from gui.pages.alerts_page import AlertsPage
 from gui.pages.dashboard_page import DashboardPage
 from gui.pages.incidents_page import IncidentsPage
-from gui.pages.ml_page import MLModelPage
 from gui.pages.processes_page import ProcessesPage
 from gui.pages.reports_page import ReportsPage
 from gui.pages.settings_page import SettingsPage
 from ml.detector import DetectionResult, RansomwareDetector, ThreatLevel
 from monitoring.file_monitor import FileMonitor
 from monitoring.process_monitor import ProcessMonitor
-from response.process_terminator import ProcessTerminator
+from response.process_terminator import ProcessTerminator, TerminationStatus
 from simulator.safe_ransomware_simulator import SafeRansomwareSimulator
 from utils.logger import get_logger
 
@@ -99,7 +99,7 @@ class TelemetryWorker(QThread):
         self._running = False
         self.file_monitor.stop()
         self.process_monitor.stop()
-        self.wait(timeout=2000)
+        self.wait(2000)
 
 
 class MainWindow(QMainWindow):
@@ -107,7 +107,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AI-Based Ransomware Detection & Process Termination System")
+        self.setWindowTitle("RansomShield - Real-Time AI Ransomware Defense & Detection System")
         self.resize(1240, 840)
         self.setMinimumSize(1000, 700)
 
@@ -121,6 +121,7 @@ class MainWindow(QMainWindow):
         self.session_ignored_pids = set()
         self._is_protected = True
         self._alert_active = False
+        self._active_sim_proc: Optional[subprocess.Popen] = None
 
         self._apply_dark_theme()
         self._init_ui()
@@ -172,13 +173,13 @@ class MainWindow(QMainWindow):
 
         # App Brand Header
         brand_box = QHBoxLayout()
-        brand_title = QLabel("🛡️ ANTIVIRUS AI")
-        brand_title.setFont(QFont("Arial", 13, QFont.Bold))
+        brand_title = QLabel("🛡️ RansomShield")
+        brand_title.setFont(QFont("Arial", 14, QFont.Bold))
         brand_title.setStyleSheet("color: #38bdf8;")
         brand_box.addWidget(brand_title)
         sidebar_layout.addLayout(brand_box)
 
-        brand_sub = QLabel("Ransomware Defense Shield")
+        brand_sub = QLabel("Autonomous Endpoint Defense")
         brand_sub.setFont(QFont("Arial", 8))
         brand_sub.setStyleSheet("color: #64748b; margin-bottom: 12px;")
         sidebar_layout.addWidget(brand_sub)
@@ -191,12 +192,9 @@ class MainWindow(QMainWindow):
             ("📊 Dashboard", 0),
             ("🔍 Active Processes", 1),
             ("📁 Live File Activity", 2),
-            ("🚨 Threat Alerts", 3),
-            ("📜 Incident History", 4),
-            ("📄 Forensic Reports", 5),
-            ("🧠 ML Model & Features", 6),
-            ("⚙️ Defense Settings", 7),
-            ("ℹ️ About & Viva Defense", 8),
+            ("📜 Incident History", 3),
+            ("📄 Forensic Reports", 4),
+            ("⚙️ Defense Settings", 5),
         ]
 
         self.nav_buttons = []
@@ -233,26 +231,8 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addStretch()
 
-        # Reset Whitelist & Ignores Button
-        btn_reset_wl = QPushButton("🔄 Reset Whitelist & Ignores")
-        btn_reset_wl.setFont(QFont("Arial", 9))
-        btn_reset_wl.setCursor(Qt.PointingHandCursor)
-        btn_reset_wl.setStyleSheet("""
-            QPushButton {
-                background-color: #334155;
-                color: #cbd5e1;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 10px;
-                margin-bottom: 4px;
-            }
-            QPushButton:hover { background-color: #475569; color: white; }
-        """)
-        btn_reset_wl.clicked.connect(self._reset_all_whitelist_and_ignores)
-        sidebar_layout.addWidget(btn_reset_wl)
-
         # Quick Test Trigger Button
-        btn_sim_attack = QPushButton("🧪 Run Test Burst Attack (80 Files)")
+        btn_sim_attack = QPushButton("🧪 Run Test Burst Attack")
         btn_sim_attack.setFont(QFont("Arial", 9, QFont.Bold))
         btn_sim_attack.setCursor(Qt.PointingHandCursor)
         btn_sim_attack.setStyleSheet("""
@@ -275,7 +255,7 @@ class MainWindow(QMainWindow):
         # -------------------------------------------------------------------
         self.stack = QStackedWidget()
 
-        # Instantiate 9 Pages
+        # Instantiate Modular Pages
         self.page_dashboard = DashboardPage(self.db)
         self.page_dashboard.toggle_protection_requested.connect(self._toggle_protection)
 
@@ -283,25 +263,16 @@ class MainWindow(QMainWindow):
         self.page_processes.process_terminated.connect(self._handle_manual_terminate)
 
         self.page_activity = LiveActivityPage()
-
-        self.page_alerts = AlertsPage(self.terminator)
-        self.page_alerts.action_triggered.connect(self._handle_alert_action)
-
         self.page_incidents = IncidentsPage(self.db)
         self.page_reports = ReportsPage(self.db)
-        self.page_ml = MLModelPage()
         self.page_settings = SettingsPage(self.db)
-        self.page_about = AboutPage()
 
         self.stack.addWidget(self.page_dashboard)   # 0
         self.stack.addWidget(self.page_processes)   # 1
         self.stack.addWidget(self.page_activity)    # 2
-        self.stack.addWidget(self.page_alerts)      # 3
-        self.stack.addWidget(self.page_incidents)   # 4
-        self.stack.addWidget(self.page_reports)     # 5
-        self.stack.addWidget(self.page_ml)          # 6
-        self.stack.addWidget(self.page_settings)    # 7
-        self.stack.addWidget(self.page_about)       # 8
+        self.stack.addWidget(self.page_incidents)   # 3
+        self.stack.addWidget(self.page_reports)     # 4
+        self.stack.addWidget(self.page_settings)    # 5
 
         root_layout.addWidget(self.stack)
 
@@ -327,7 +298,6 @@ class MainWindow(QMainWindow):
         if self._alert_active:
             return
 
-        self.page_alerts.add_alert(res)
         self.page_dashboard.refresh_stats()
 
         # Display Interactive Popup
@@ -345,6 +315,15 @@ class MainWindow(QMainWindow):
         name = res.suspect_name or "unknown"
 
         if action == "terminate":
+            # Safety assertion: never self-terminate the host application or root process
+            if pid == os.getpid() or pid <= 1:
+                QMessageBox.warning(
+                    self,
+                    "Action Denied",
+                    f"Process '{name}' (PID: {pid}) is the protected host security application or system service and cannot be terminated.",
+                )
+                return
+
             rep = self.terminator.terminate_process(pid, reason=f"GUI Prompt Termination for {res.threat_level.value}")
             self.db.record_incident(
                 threat_level=res.threat_level.value,
@@ -355,7 +334,24 @@ class MainWindow(QMainWindow):
                 features=res.features,
                 details=rep.details,
             )
-            QMessageBox.information(self, "Process Terminated", f"Successfully terminated {name} (PID: {pid}). File system secured.")
+            if rep.status in (TerminationStatus.TERMINATED, TerminationStatus.KILLED_FORCEFULLY):
+                QMessageBox.information(
+                    self,
+                    "Process Terminated",
+                    f"Successfully terminated {name} (PID: {pid}). File system secured.",
+                )
+            elif rep.status == TerminationStatus.PROTECTED_SYSTEM_PROCESS:
+                QMessageBox.warning(
+                    self,
+                    "Action Denied",
+                    f"Process '{name}' (PID: {pid}) is protected and cannot be terminated.",
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Termination Notice",
+                    f"Could not terminate {name} (PID: {pid}): {rep.details}",
+                )
 
         elif action == "ignore":
             if pid > 0:
@@ -386,14 +382,6 @@ class MainWindow(QMainWindow):
             self.page_settings.refresh_whitelist()
             QMessageBox.information(self, "Process Whitelisted", f"Added '{name}' to trusted whitelist.")
 
-    def _handle_alert_action(self, action: str, pid: int, name: str):
-        if action == "terminate" and pid > 0:
-            rep = self.terminator.terminate_process(pid, reason="Terminated from Alerts Page")
-            self.db.record_incident("MANUAL", 1.0, pid, name, f"TERMINATED ({rep.status.value})", details=rep.details)
-            self.page_dashboard.refresh_stats()
-            self.page_incidents.load_incidents()
-            QMessageBox.information(self, "Process Terminated", f"Terminated {name} (PID {pid}).")
-
     def _handle_manual_terminate(self, pid: int, name: str):
         self.db.record_incident("MANUAL_USER", 1.0, pid, name, "TERMINATED_FROM_PROCESS_PAGE", details="User manual kill")
         self.page_dashboard.refresh_stats()
@@ -407,29 +395,41 @@ class MainWindow(QMainWindow):
             self.worker.pause()
         self.page_dashboard.set_protection_status(self._is_protected)
 
-    def _reset_all_whitelist_and_ignores(self):
-        self.session_ignored_pids.clear()
-        cnt = self.db.clear_whitelist()
-        self.page_settings.refresh_whitelist()
-        QMessageBox.information(
-            self,
-            "Protection & Whitelist Reset",
-            f"Cleared {cnt} entries from whitelist and reset all session ignores.\n"
-            "The AI detector will now prompt for all suspicious activity!",
-        )
-
     def _run_test_simulation(self):
-        sim = SafeRansomwareSimulator(num_files=80)
-        QTimer.singleShot(200, sim.run_full_simulation)
-        QMessageBox.information(
-            self,
-            "Simulation Started (80 Files)",
-            "Safe 80-file ransomware burst initiated inside test_environment/.\n"
-            "If the process is NOT whitelisted, the prompt alert will appear.\n"
-            "(If whitelisted, it will run silently until you click 'Reset Whitelist'.)",
-        )
+        """Launch mock ransomware actor as an isolated external process.
+        Running as a separate process ensures that when the user terminates
+        the detected threat, it terminates the rogue actor process without
+        affecting or crashing the main GUI application."""
+        try:
+            # Terminate any previously running simulation subprocess
+            if self._active_sim_proc and self._active_sim_proc.poll() is None:
+                try:
+                    self._active_sim_proc.terminate()
+                except Exception:
+                    pass
+
+            actor_script = os.path.join(config.BASE_DIR, "simulator", "mock_ransomware_actor.py")
+            proc = subprocess.Popen([sys.executable, actor_script])
+            self._active_sim_proc = proc
+            logger.info("Launched mock ransomware actor subprocess with PID %d", proc.pid)
+
+            QMessageBox.information(
+                self,
+                "Burst Simulation Started",
+                f"Isolated test threat launched (PID: {proc.pid}) inside test_environment/.\n\n"
+                "Watch the Live Activity and Threat Alert react.\n"
+                "When the prompt appears, you can safely click [Terminate Process] to terminate the rogue process!",
+            )
+        except Exception as e:
+            logger.exception("Error starting burst attack: %s", e)
+            QMessageBox.critical(self, "Simulation Error", f"Failed to start burst attack:\n{str(e)}")
 
     def closeEvent(self, event):
+        if self._active_sim_proc and self._active_sim_proc.poll() is None:
+            try:
+                self._active_sim_proc.terminate()
+            except Exception:
+                pass
         self.worker.stop()
         event.accept()
 

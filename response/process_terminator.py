@@ -79,8 +79,10 @@ class ProcessTerminator:
         )
 
     def is_protected(self, pid: int, name: Optional[str] = None) -> bool:
-        """Check if process is a critical system service or PID <= 1."""
+        """Check if process is a critical system service, PID <= 1, or the host application."""
         if pid <= 1:
+            return True
+        if pid == os.getpid():
             return True
         if name and name.lower().strip() in self.protected_binaries:
             return True
@@ -98,7 +100,7 @@ class ProcessTerminator:
         now = time.time()
         logger.info("Initiating process termination request for PID=%d. Reason: %s", pid, reason)
 
-        # Check PID 0/1 guard
+        # Check PID 0/1 guard and host application PID guard
         if pid <= 1:
             logger.error("Refusing to terminate root system PID %d.", pid)
             return TerminationReport(
@@ -108,6 +110,17 @@ class ProcessTerminator:
                 reason=reason,
                 timestamp=now,
                 details="PID <= 1 is protected.",
+            )
+
+        if pid == os.getpid():
+            logger.error("Refusing to self-terminate host application PID %d.", pid)
+            return TerminationReport(
+                pid=pid,
+                process_name="antivirus_host_app",
+                status=TerminationStatus.PROTECTED_SYSTEM_PROCESS,
+                reason=reason,
+                timestamp=now,
+                details="Self-termination of the host defense application is blocked.",
             )
 
         try:

@@ -121,7 +121,7 @@ class ReportGenerator:
         # -------------------------------------------------------------------
         # Header Banner
         # -------------------------------------------------------------------
-        story.append(Paragraph("AI-BASED RANSOMWARE DETECTION SYSTEM", self.title_style))
+        story.append(Paragraph("RANSOMSHIELD ENDPOINT DEFENSE SYSTEM", self.title_style))
         story.append(Paragraph(f"Forensic Incident Investigation Report — Case #INC-{incident.id:04d}", self.subtitle_style))
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#1a73e8"), spaceAfter=12))
 
@@ -307,7 +307,7 @@ class ReportGenerator:
         )
         story = []
 
-        story.append(Paragraph("AI-BASED RANSOMWARE DETECTION SYSTEM", self.title_style))
+        story.append(Paragraph("RANSOMSHIELD ENDPOINT DEFENSE SYSTEM", self.title_style))
         story.append(Paragraph("System Security Audit & Threat Statistics Summary Report", self.subtitle_style))
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#1a73e8"), spaceAfter=12))
 

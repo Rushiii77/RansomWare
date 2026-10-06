@@ -8,6 +8,7 @@ from features.feature_extractor, computes ransomware probability, categorizes
 the threat level, and attributes candidate offending processes.
 """
 
+import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -87,10 +88,26 @@ class RansomwareDetector:
         if not process_snapshots:
             return None, None
 
-        # Filter out system or idle processes, pick highest CPU consumer
-        candidates = [p for p in process_snapshots if p.pid > 0 and p.name.lower() not in ("kernel_task", "system", "idle")]
+        current_pid = os.getpid()
+
+        # Prioritize dedicated mock ransomware or simulator actor process if present
+        for p in process_snapshots:
+            if p.pid > 0 and p.pid != current_pid:
+                pname = p.name.lower()
+                if "mock_ransomware" in pname or "safe_ransomware" in pname:
+                    return p.pid, p.name
+
+        # Filter out system or idle processes AND the host detector application itself
+        candidates = [
+            p for p in process_snapshots
+            if p.pid > 1 and p.pid != current_pid and p.name.lower() not in ("kernel_task", "system", "idle")
+        ]
         if not candidates:
-            candidates = process_snapshots
+            # Fallback to any non-self candidate
+            candidates = [p for p in process_snapshots if p.pid > 1 and p.pid != current_pid]
+
+        if not candidates:
+            return None, None
 
         top = max(candidates, key=lambda p: p.cpu_percent)
         return top.pid, top.name

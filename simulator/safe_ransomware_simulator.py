@@ -136,7 +136,10 @@ class SafeRansomwareSimulator:
             self._enforce_safe_path(path)
             if not os.path.exists(path):
                 continue
-            new_path = path + suffix
+            if path.endswith(suffix):
+                new_path = path[:-len(suffix)]
+            else:
+                new_path = path + suffix
             self._enforce_safe_path(new_path)
             os.rename(path, new_path)
             renamed.append(new_path)
@@ -156,11 +159,10 @@ class SafeRansomwareSimulator:
 
     # ------------------------------------------------------------------
     # Cleanup
-    # ------------------------------------------------------------------
     def cleanup(self):
         """Delete every file this simulator instance created/renamed.
         Restricted to the safe root like every other operation here."""
-        logger.info("Simulator: cleaning up %d files.", len(self._created_files))
+        logger.info("Simulator: cleaning up %d tracked files.", len(self._created_files))
         for path in list(self._created_files):
             self._enforce_safe_path(path)
             if os.path.exists(path):

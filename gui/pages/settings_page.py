@@ -185,9 +185,12 @@ class SettingsPage(QWidget):
 
         # Whitelist Table
         self.table_wl = QTableWidget()
-        self.table_wl.setColumnCount(2)
-        self.table_wl.setHorizontalHeaderLabels(["Trusted Process Name", "Status"])
-        self.table_wl.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_wl.setColumnCount(3)
+        self.table_wl.setHorizontalHeaderLabels(["Trusted Process Name", "Status", "Action"])
+        self.table_wl.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table_wl.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table_wl.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self.table_wl.setColumnWidth(2, 100)
         self.table_wl.verticalHeader().setVisible(False)
         self.table_wl.setStyleSheet("""
             QTableWidget {
@@ -206,36 +209,20 @@ class SettingsPage(QWidget):
         """)
         right_layout.addWidget(self.table_wl)
 
-        wl_btn_box = QHBoxLayout()
-        btn_del_wl = QPushButton("Remove Selected")
-        btn_del_wl.setStyleSheet("""
-            QPushButton {
-                background-color: #e11d48;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 6px 12px;
-            }
-            QPushButton:hover { background-color: #be123c; }
-        """)
-        btn_del_wl.clicked.connect(self._remove_selected_whitelist)
-        wl_btn_box.addWidget(btn_del_wl)
-
-        btn_clear_wl = QPushButton("Clear Entire Whitelist")
+        btn_clear_wl = QPushButton("🧹 Clear Entire Whitelist")
         btn_clear_wl.setStyleSheet("""
             QPushButton {
-                background-color: #475569;
+                background-color: #334155;
                 color: #f8fafc;
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
+                font-weight: bold;
             }
-            QPushButton:hover { background-color: #334155; }
+            QPushButton:hover { background-color: #475569; }
         """)
         btn_clear_wl.clicked.connect(self._clear_all_whitelist)
-        wl_btn_box.addWidget(btn_clear_wl)
-
-        right_layout.addLayout(wl_btn_box)
+        right_layout.addWidget(btn_clear_wl)
 
         content_layout.addWidget(right_box, stretch=1)
         layout.addLayout(content_layout)
@@ -267,23 +254,30 @@ class SettingsPage(QWidget):
             self.refresh_whitelist()
             QMessageBox.information(self, "Process Whitelisted", f"Added '{name}' to trusted whitelist.")
 
-    def _remove_selected_whitelist(self):
-        curr_row = self.table_wl.currentRow()
-        if curr_row < 0:
-            QMessageBox.warning(self, "Selection Required", "Please select a whitelisted process from the table to remove.")
-            return
-        name_item = self.table_wl.item(curr_row, 0)
-        if name_item:
-            name = name_item.text()
-            self.db.remove_from_whitelist(name)
-            self.refresh_whitelist()
-            QMessageBox.information(self, "Whitelist Updated", f"Removed '{name}' from whitelist. Alerts will now trigger for this process.")
+    def _remove_from_whitelist(self, name: str):
+        reply = QMessageBox.question(
+            self,
+            "Confirm Whitelist Removal",
+            f"Remove '{name}' from the trusted whitelist?\n\nRansomShield will actively monitor and alert on this process again.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            if self.db.remove_from_whitelist(name):
+                self.refresh_whitelist()
+                QMessageBox.information(
+                    self,
+                    "Process Removed",
+                    f"'{name}' was removed from the whitelist.\nRansomShield behavioral detection is now active for this process.",
+                )
+            else:
+                QMessageBox.warning(self, "Notice", f"Could not remove '{name}'.")
 
     def _clear_all_whitelist(self):
         reply = QMessageBox.question(
             self,
             "Clear Whitelist",
-            "Are you sure you want to clear the entire process whitelist? All previously ignored/whitelisted processes will trigger alerts again.",
+            "Are you sure you want to clear the entire process whitelist?\n\nAll processes will trigger active defense monitoring and alerts again.",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -301,4 +295,21 @@ class SettingsPage(QWidget):
             item_s.setTextAlignment(Qt.AlignCenter)
             item_s.setForeground(Qt.green)
             self.table_wl.setItem(row, 1, item_s)
+
+            btn_del = QPushButton("🗑️ Remove")
+            btn_del.setStyleSheet("""
+                QPushButton {
+                    background-color: #ef4444;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #dc2626; }
+            """)
+            btn_del.setCursor(Qt.PointingHandCursor)
+            btn_del.clicked.connect(lambda _, proc_name=n: self._remove_from_whitelist(proc_name))
+            self.table_wl.setCellWidget(row, 2, btn_del)
 
